@@ -4,7 +4,7 @@
     <a href="https://www.linkedin.com/in/imane-bachiri-27a237253/"><img src="https://img.shields.io/badge/linkedin-%230177B5?style=flat&logo=linkedin&logoColor=white"/></a>
   </p>
   
-As a Data Engineering student, I am passionate about data science and technologies to solve real-world challenges.
+As a student of Data Engineering, I am driven by the potential of data science and technology to find solutions to real-world problems.
 
 - Python 🐍: Machine Learning & Deep Learning & Web Scraping 
 - Java & JS 🖥️ & HTML & CSS 📄🎨 & Kotlin, MySQL & NoSQL| MongoDB & Docker, R 🔢 & ACL Analytics 📊
