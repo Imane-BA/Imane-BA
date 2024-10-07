@@ -7,5 +7,5 @@
 As a Data Engineering Student, I am driven by the potential of data science and technology to find solutions to real-world problems.
 
 - Python 🐍: Machine Learning & Deep Learning & Web Scraping 
-- Java & JS 🖥️ & HTML & CSS 📄🎨 & Kotlin, MySQL & NoSQL| MongoDB & Docker, R 🔢 & ACL Analytics 📊
+- Java & JS 🖥️ & HTML & CSS 📄🎨 & Kotlin, MySQL & NoSQL| MongoDB, R 🔢 & ACL Analytics 📊
 - 💬 mailto: imanebachiri000@gmail.com
