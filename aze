@@ -1,0 +1,209 @@
+import PyPDF2
+import re
+import os
+import pandas as pd
+
+# Fonction pour nettoyer le texte
+def clean_text(text):
+     # Remplacer plusieurs espaces ou sauts de ligne par un seul espace
+     cleaned_text = re.sub(r'\s+', ' ', text)
+
+     #Supprimer les retours à la ligne (\n et \r) et les espaces inutiles au début et à la fin
+     cleaned_text = cleaned_text.replace('\n', ' ').replace('\r', ' ').strip()
+     return cleaned_text      
+
+# Méthode générique pour tenter les deux méthodes de recherche (search et finditer)
+def search_and_finditer(patterns, text, groups):
+    match = None
+    # Si pas trouvé, tenter avec re.finditer
+    for pattern in patterns:
+        matches = list(re.finditer(pattern, text))
+        if matches:
+            return matches[-1].groups()[:groups]  # Retourner les groupes du dernier match
+    # Tenter d'abord avec re.search
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.groups()[:groups]  # Retourner les groupes trouvés
+    return [None] * groups  # Retourner None si aucune correspondance
+
+# Fonction pour extraire les informations
+def extract_information(text):
+     # Nettoyer le texte avant extraction
+     text = clean_text(text)
+
+     data = {}
+    
+     # Liste des expressions régulières pour matcher les informations du collecteur
+     collector_patterns = [
+        r"COLLECTEUR\s+Nom:\s*(\w+)\s+Prénom:\s*(\w+)\s+E-Mail:\s*([\w\.-]+@[\w\.-]+)\s+Mobile:\s*(\d+)",
+        r"Collecteur\s+Nom\s*:\s*(\w+)\s*Prénom\s*:\s*(\w+)\s*E-Mail\s*:\s*([\w\.-]+@[\w\.-]+)\s*Mobile\s*:\s*(\d+)",
+        r"Collecteur\s*Nom:\s*([\w\-]+)\s*Prénom:\s*([\w\-]+)\s*E-Mail:\s*([\w\.-]+)\s*Mobile:\s*([\d\s]+)",
+        r"COLLECTEUR\s+Nom:\s*(\w+)\s+Prénom:\s*(\w+)\s+E-Mail:\s*([\w\.-]+@[\w\.-]+)\s+Mobile:\s*(\d+)",
+        r"COLLECTEUR\s+Nom\s*:\s*([\w\s\-]+)\s+Prénom\s*:\s*([\w\s\-]+)\s+E-Mail\s*:\s*([\w\.-]+@[\w\.-]+)\s+Mobile\s*:\s*(\d+)",
+    ]
+    
+     # Parcourir les différentes expressions régulières
+     # Extraire les informations du collecteur
+     collector_info = search_and_finditer(collector_patterns, text, 4)
+     data['NOM_COLLECTEUR'], data['PRENOM_COLLECTEUR'], data['EMAIL_COLLECTEUR'], data['MOBILE_COLLECTEUR'] = collector_info
+    
+     # Liste des expressions régulières pour matcher les informations du signataire 1
+     signatory1_patterns = [
+        r"SIGNATAIRE1\s+Nom:\s*([\w\s\-]+)\s+Prénom:\s*([\w\s\-]+)\s+E-Mail:\s*([\w\.-]+@[\w\.-]+)\s+Mobile:\s*(\d+)",
+        r"Signataire\s*1\s*Nom\s*:\s*([\w\s\-]+)\s*Prenom\s*:\s*([\w\s\-]+)\s*E-Mail\s*:\s*([\w\.-]+@[\w\.-]+)\s*Mobile\s*:\s*(\d+)",
+        r"SIGNATAIRE1\s+Nom:\s*(\w+)\s+Prénom:\s*(\w+)\s+E-Mail:\s*([\w\.-]+@[\w\.-]+)\s+Mobile:\s*(\d+)",
+        r"Signataire\s*1\s*Nom\s*:\s*(\w+)\s*Prenom\s*:\s*(\w+)\s*E-Mail\s*:\s*([\w\.-]+@[\w\.-]+)\s*Mobile\s*:\s*(\d+)",
+        r"Signataire\s*Nom\s*:\s*(\w+)\s*Prenom\s*:\s*(\w+)\s*Email\s*:\s*([\w\.-]+@[\w\.-]+)\s*Mobile\s*:\s*(\d+)",
+        r"SIGNATAIRE1\s+Nom:\s*([\w\s\-]+)\s+Prénom:\s*([\w\s\-]+)\s+E-Mail:\s*([\w\.-]+@[\w\.-]+)\s+Mobile:\s*(\d+)",
+        r"Signataire\s*1\s*Nom\s*:\s*([\w\s\-]+)\s*Prenom\s*:\s*([\w\s\-]+)\s*E-Mail\s*:\s*([\w\.-]+@[\w\.-]+)\s*Mobile\s*:\s*(\d+)",    
+        r"Signataire 1\s*Nom\s*:\s*(\w+)\s*Prénom\s*:\s*(\w+)\s*E-Mail\s*:\s*([\w\.-]+@[\w\.-]+)\s*Mobile\s*:\s*(\d+)",
+        r"SIGNATAIRE1\s+Nom:\s*([\w\s\-]+)\s+Prénom:\s*([\w\s\-]+)\s+E-Mail:\s*([\w\.-]+@[\w\.-]+)\s+Mobile:\s*(\d+)",
+        r"SIGNATAIRE\s+1\s+Nom:\s*([\w\s\-]+)\s+Prénom:\s*([\w\s\-]+)\s+E-Mail:\s*([\w\.-]+@[\w\.-]+)\s+Mobile:\s*(\d+)"
+
+    ]
+    
+     # Extraire les informations du signataire 1
+     signatory1_info = search_and_finditer(signatory1_patterns, text, 4)
+     data['NOM_SIGNATAIRE1'], data['PRENOM_SIGNATAIRE1'], data['EMAIL_SIGNATAIRE1'], data['MOBILE_SIGNATAIRE1'] = signatory1_info
+
+     # Liste des expressions régulières pour matcher la date de création
+     date_patterns = [
+        r"DÉTAILS\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})",
+        r"Création\s+\d{4}-\d{2}-\d{2}\s*(\d{2}:\d{2}:\d{2})",
+        r"Création\s*de\s*la\s*collecte\s*par\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})",
+        r"Création de la collecte par .* (\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2})"
+    ]
+    
+     # Extraire la date de création
+     date_creation = search_and_finditer(date_patterns, text, 1)
+     data['DATE_CREATION'] = date_creation[0]
+    
+    
+     # Liste des expressions régulières pour matcher les informations du créateur
+     creator_patterns = [
+        r"Création de la collecte par\s*(\w+)\s*(\w+)\s*<\s*([\w\.-]+@[\w\.-]+)\s*>",
+        r"Création\s+par\s+(\w+)\s+(\w+)\s*<\s*([\w\.-]+@[\w\.-]+)\s*>",
+        r"Création\s*par\s*(\w+)\s*(\w+)\s*<\s*([\w\.-]+@\w+\.\w+)\s*>",
+        r"Création de la collecte par\s*([\w\s\-]+)\s*<\s*([\w\.-]+@[\w\.-]+)\s*>",
+        r"Création\s+de\s+la\s+collecte\s+par\s+([\w\s\-]+)\s+<([\w\.-]+@[\w\.-]+)>"
+
+    ]
+    
+     # Extraire les informations du créateur
+     creator_info = search_and_finditer(creator_patterns, text, 3)
+     data['PRENOM_CREATEUR'], data['NOM_CREATEUR'], data['EMAIL_CREATEUR'] = creator_info
+
+    
+     # Liste des expressions régulières pour matcher la date de connexion et l'IP
+     connexion_patterns = [
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*Adresse IP\s*:\s*([\d\.]+)",
+        r"Connexion.*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?IP\s*:\s*([\d\.]+)",
+        r"Connexion du signataire.*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*Adresse IP :\s*([\d\.]+)",
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*Adresse IP\s*:\s*([\d\.]+)",
+        r"Connexion du signataire.*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?IP\s*:\s*([\d\.]+)",
+        r"Connexion du signataire .*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*Adresse IP\s*:\s*(\d+\.\d+\.\d+\.\d+)",
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*CET\[\S+ =>\] • Connexion du signataire .*?Adresse IP\s*:\s*([\d\.]+)",
+        r"(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}).*?Connexion.*?Adresse IP\s*:\s*([\d\.]+)"
+    ]
+    
+     # Extraire les informations de connexion
+     connexion_info = search_and_finditer(connexion_patterns, text, 2)
+     data['IP_SIGNATAIRE'], data['DATE_CONNEXION'] = connexion_info
+
+    
+     # Liste des expressions régulières pour matcher la date d'authentification et le mobile
+     auth_patterns = [
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*Authentification du signataire : envoi de l'OTP à <(\d+)>",
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*OTP envoyé à <(\d+)>",
+        r"Authentification.*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*envoi de l'OTP à <(\d+)>",
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*CET.*?Auth.*OTP.*?à\s*\{(\d+)\}",
+        r"Authentification.*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*OTP.*?à\s*\{(\d+)\}",
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*OTP à <(\d+)>",
+        r"Authentification du signataire : envoi de l'OTP à \((\d+)\)",
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*CET\[\S+ =>\S+\]• Authentification du signataire : envoi de l'OTP à <(\d+)>",
+        r"(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}).*?OTP à \{(\d+)\}"
+    ]
+    
+     # Extraire les informations d'authentification
+     auth_info = search_and_finditer(auth_patterns, text, 2)
+     data['DATE_AUTHENTIFICATION'], data['MOBILE_AUTHENTIFICATION'] = auth_info
+
+    
+    
+     # Liste des expressions régulières pour matcher la date d'approbation
+     approval_patterns = [
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*Le signataire a approuvé les conditions",
+        r"Approbation\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?Conditions approuvées",
+        r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*Approbation des conditions",
+        r"Le signataire a approuvé les conditions .* (\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2})"
+    ]
+    
+    
+     # Extraire la date d'approbation
+     approval_info = search_and_finditer(approval_patterns, text, 1)
+     data['DATE_APPROBATION'] = approval_info[0] if approval_info[0] else None
+
+    
+    
+     # Liste des expressions régulières pour matcher la date d'envoi
+     date_envoi_patterns = [
+         r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*CET\[GC =>\] • Envoi de document\(s\) signé\(s\) par e-mail à",
+         r"(\d{4}-\d{2}-\d{2}\s*\d{2}:\d{2}:\d{2})\s*CET\s*\[GC =>\]\s*•\s*Envoi de document\(s\)\s*signé\(s\)\s*par e-mail à",
+         r"(\d{4}-\d{2}-\d{2}\s*\d{2}:\d{2}:\d{2})\s*\S*\s*\[GC =>\]\s*•\s*Envoi\s*de\s*document\(s\)\s*signé\(s\)\s*par\s*e-mail\s*à",
+         r"Envoi de document\(s\) signé\(s\) .* (\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2})"
+     ]
+    
+     # Extraire la date d'approbation
+     date_envoi_info = search_and_finditer(date_envoi_patterns, text, 1)
+     data['DATE_ENVOI_DOC'] = date_envoi_info[0] if date_envoi_info[0] else None  # Utilisation de l'index [0]
+
+    
+    
+
+     # Liste des expressions régulières supplémentaires pour le récepteur
+     receiver_patterns = [
+         r"Envoi de document\(s\) signé\(s\) par e-mail à\s+(\w+)\s+(\w+)\s+<([\w\.-]+@[\w\.-]+)>",
+         r"Envoi de document\(s\) signé\(s\) par e-mail à\s*(\w+)\s*(\w+)\s*<\s*([\w\.-]+@[\w\.-]+)\s*>",
+         r"Envoi de document\(s\) signé\(s\) par e-mail à\s*([\w\-]+)\s*([\w\-]+)\s*<\s*([\w\.-]+@[\w\.-]+)\s*>",
+         r"Envoi de document\(s\) signé\(s\) par e-mail à\s*([\w\s\-]+)\s+([\w\s\-]+)\s*<\s*([\w\.-]+@[\w\.-]+)\s*>",
+         r"Envoi\s+de\s+document\(s\)\s+signé\(s\)\s+par\s+e-mail\s+à\s+([\w\s\-]+)\s+<([\w\.-]+@[\w\.-]+)>"
+     ]
+
+     # Extraire la date d'approbation
+     receiver_info = search_and_finditer(receiver_patterns, text, 3)
+     data['PRENOM_RECEPTEUR'], data['NOM_RECEPTEUR'], data['EMAIL_RECEPTEUR'] = receiver_info
+
+     return data
+
+# Chemin du dossier contenant les fichiers PDF
+folder_path = 'M:/Surete/DONNEES_CONTRATS/ESIGNATURE/PDF'  # Remplacez par le chemin de votre dossier
+
+# Créer une liste pour stocker les données extraites
+all_data = []
+
+# Itérer sur chaque fichier dans le dossier
+for filename in os.listdir(folder_path):
+    if filename.endswith('.pdf'):
+        pdf_path = os.path.join(folder_path, filename)
+        with open(pdf_path, 'rb') as pdf_file:
+            reader = PyPDF2.PdfReader(pdf_file)
+            text = ''
+            for page in reader.pages:
+                text += page.extract_text()
+
+        # Extraire les informations du fichier PDF
+        extracted_data = extract_information(text)
+        all_data.append(extracted_data)
+
+# Convertir les données en DataFrame
+df = pd.DataFrame(all_data)
+
+# Chemin du fichier de sortie CSV
+output_csv_path = 'M:/Surete/DONNEES_CONTRATS/ESIGNATURE/XT_TEMP.csv'
+
+# Enregistrer le DataFrame dans un fichier CSV
+df.to_csv(output_csv_path, index=False)
+print(f"Les données extraites ont été enregistrées dans '{output_csv_path}'.")
+
+
