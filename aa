@@ -1,0 +1,67 @@
+import extract_msg  # Pour manipuler les fichiers .msg
+from PIL import Image  # Pour lire les fichiers .tif
+import pytesseract  # Pour effectuer l'OCR sur les fichiers .tif
+import os  # Pour gérer les fichiers et dossiers
+
+# Fonction pour extraire et traiter les fichiers .tif d'un email .msg
+def extract_and_process_tif_from_msg(msg_file_path, output_dir):
+    # Charger le fichier .msg
+    msg_file = extract_msg.Message(msg_file_path)
+    # Obtenir les informations principales de l'email
+    email_info = {
+        "Receiver": msg_file.to,
+        "Sender": msg_file.sender,
+        "Date": msg_file.date,
+        "Subject": msg_file.subject
+    }
+    print("INFORMATIONS EMAIL :")
+    for key, value in email_info.items():
+        print(f"{key}: {value}")
+
+    # Créer le dossier de sortie si nécessaire
+    os.makedirs(output_dir, exist_ok=True)
+
+    extracted_texts = []  # Liste pour stocker les textes extraits des pièces jointes
+
+    for attachment in msg_file.attachments:
+        # Vérifier si l'attachement est un fichier .tif
+        if attachment.longFilename.lower().endswith('.tif'):
+            # Sauvegarder la pièce jointe localement
+            tif_file_path = os.path.join(output_dir, attachment.longFilename)
+            with open(tif_file_path, 'wb') as tif_file:
+                tif_file.write(attachment.data)
+            print(f"Fichier {attachment.longFilename} sauvegardé dans {output_dir}")
+
+            # Ouvrir le fichier .tif pour traitement OCR
+            try:
+                with Image.open(tif_file_path) as img:
+                    # Effectuer l'OCR pour extraire le texte
+                    extracted_text = pytesseract.image_to_string(img)
+                    print(f"\nTexte extrait du fichier {attachment.longFilename} :\n")
+                    print(extracted_text)
+                    extracted_texts.append({
+                        "FileName": attachment.longFilename,
+                        "ExtractedText": extracted_text
+                    })
+            except Exception as e:
+                print(f"Erreur lors de la lecture du fichier .tif : {e}")
+
+    return {"EmailInfo": email_info, "Attachments": extracted_texts}
+
+# Définir le chemin du fichier .msg et le dossier de sortie
+msg_file_path = "/mnt/data/UBS VIR TRESO X 3 %3A Your fax.msg"  # Chemin vers le fichier fourni
+output_dir = "output_tif_files"  # Dossier pour sauvegarder les fichiers .tif
+
+# Extraire et traiter les fichiers .tif
+results = extract_and_process_tif_from_msg(msg_file_path, output_dir)
+
+# Afficher les résultats sous forme structurée
+print("\nRÉSULTATS STRUCTURÉS :")
+print("EMAIL INFORMATION :")
+for key, value in results["EmailInfo"].items():
+    print(f"{key}: {value}")
+
+print("\nTEXTES EXTRACTÉS DES PIÈCES JOINTES :")
+for attachment in results["Attachments"]:
+    print(f"Nom du fichier : {attachment['FileName']}")
+    print(f"Texte extrait :\n{attachment['ExtractedText']}\n")
