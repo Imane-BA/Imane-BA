@@ -1,0 +1,72 @@
+import extract_msg  # Pour manipuler les fichiers .msg
+from PIL import Image  # Pour traiter les fichiers .tif
+import os  # Pour gérer les fichiers et dossiers
+import re  # Pour rechercher des motifs spécifiques dans le texte
+
+# Fonction pour extraire et sauvegarder les fichiers .tif
+def extract_tif_from_msg(msg_file_path, output_dir):
+    # Charger le fichier .msg
+    msg_file = extract_msg.Message(msg_file_path)
+    # Obtenir le destinataire, l'expéditeur et la date
+    recepteur = msg_file.to
+    expediteur = msg_file.sender
+    date_message = msg_file.date
+
+    # Afficher les informations principales de l'e-mail
+    print(f"RECEPTEUR : {recepteur}")
+    print(f"EXPÉDITEUR : {expediteur}")
+    print(f"DATE DU MESSAGE : {date_message}")
+
+    # Créer le dossier de sortie si nécessaire
+    os.makedirs(output_dir, exist_ok=True)
+
+    for attachment in msg_file.attachments:
+        # Vérifier si l'attachement est un fichier .tif
+        if attachment.longFilename.lower().endswith('.tif'):
+            # Chemin pour enregistrer le fichier
+            output_file_path = os.path.join(output_dir, attachment.longFilename)
+            # Sauvegarder les données binaires dans un fichier .tif
+            with open(output_file_path, 'wb') as tif_file:
+                tif_file.write(attachment.data)
+            print(f"Fichier {attachment.longFilename} sauvegardé dans {output_dir}")
+
+# Fonction pour extraire les informations spécifiques du contenu de l'email
+def extract_specific_info_from_msg(msg_file_path):
+    # Charger le fichier .msg
+    msg_file = extract_msg.Message(msg_file_path)
+    # Lire le corps du message
+    msg_body = msg_file.body
+
+    # Définir les motifs de recherche
+    patterns = {
+        "Date": r"Date:\s*(.+)",
+        "Sent for": r"Sent for\s+(\d+)",
+        "Remote ID": r"with remote ID\s+(.+)",
+        "Results": r"Results:\s*(.+)",
+        "Nb of pages": r"Nb of pages:\s*(\d+)",
+        "Elapsed time": r"Elapsed time:\s*(.+)",
+        "Channel": r"on channel\s*(\d+)"
+    }
+
+    # Extraire les informations en fonction des motifs
+    extracted_info = {}
+    for key, pattern in patterns.items():
+        match = re.search(pattern, msg_body)
+        extracted_info[key] = match.group(1) if match else None
+
+    return extracted_info
+
+# Définir le chemin du fichier .msg et le dossier de sortie
+msg_file_path = "path_to_your_file.msg"  # Remplace par le chemin de ton fichier
+output_dir = "output_tif_files"  # Dossier pour sauvegarder les fichiers .tif
+
+# Extraire et sauvegarder les fichiers .tif
+extract_tif_from_msg(msg_file_path, output_dir)
+
+# Extraire les informations spécifiques de l'e-mail
+info = extract_specific_info_from_msg(msg_file_path)
+
+# Afficher les informations extraites
+print("\nINFORMATIONS EXTRACTÉES :")
+for key, value in info.items():
+    print(f"{key}: {value}")
