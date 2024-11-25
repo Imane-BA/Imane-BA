@@ -1,0 +1,85 @@
+#Ce code extrait des informations d'un fichier e-mail au format .msg, lit les fichiers Excel joints, puis les traite et les affiche sous forme de tableaux bien structurés. 
+#D'abord, il utilise la bibliothèque `extract_msg` pour charger et extraire les informations principales de l'e-mail comme le destinataire, l'expéditeur et la date. 
+#Ensuite, pour chaque pièce jointe Excel dans l'e-mail, le code lit les données de chaque feuille Excel, nettoie les données en supprimant les lignes et colonnes vides, 
+#et remplace les sauts de ligne dans les cellules. 
+#Ces données nettoyées sont ensuite converties en JSON pour un affichage structuré. 
+#Enfin, les données JSON sont converties en tableaux et affichées sous forme de tableaux alignés en utilisant la bibliothèque `texttable`, rendant les données faciles à lire et à interpréter.
+
+import extract_msg  # Importer le module pour travailler avec les fichiers .msg
+import pandas as pd  # Importer la bibliothèque Pandas pour manipuler les données
+from io import BytesIO  # Importer BytesIO pour traiter les données binaires 
+import json  # Importer le module JSON pour travailler avec les données JSON
+from texttable import Texttable  # Importer Texttable pour afficher les tables
+
+#les documents excel stocker dans un mail sous forme de donnee binaire une serie de 0 et 1 
+def extract_excel_content_from_bytes(bytes_data):
+    try:
+        # Lire toutes les feuilles du fichier Excel à partir des données binaires
+        excel_data = pd.read_excel(BytesIO(bytes_data), sheet_name=None)
+        # Supprimer les lignes et colonnes contenant uniquement des NaN dans chaque feuille
+        excel_data = {sheet_name: data.dropna(how='all', axis=0).dropna(how='all', axis=1)
+                      for sheet_name, data in excel_data.items()}
+        # Enlever les sauts de ligne \n dans les valeurs des cellules
+        excel_data = {sheet_name: data.replace('\n', ' ', regex=True) for sheet_name, data in excel_data.items()}
+        return excel_data
+    except Exception as e:
+        # Retourner un message d'erreur en cas d'exception
+        return f"Erreur de lecture du fichier Excel : {str(e)}"
+
+def extract_msg_info_and_excel(msg_file_path):
+    # Charger le fichier .msg
+    msg_file = extract_msg.Message(msg_file_path)
+    # Obtenir le destinataire de l'e-mail
+    recepteur = msg_file.to
+    # Obtenir l'expéditeur de l'e-mail
+    expediteur = msg_file.sender
+    # Obtenir la date du message
+    date_message = msg_file.date
+
+    # Afficher les informations principales de l'e-mail
+    print(f"RECEPTEUR : {recepteur}")
+    print(f"EXPÉDITEUR : {expediteur}")
+    print(f"DATE DU MESSAGE : {date_message}")
+
+    print("CONTENU DES FICHIERS EXCEL EN FORMAT JSON :")
+    excel_tables = {}
+    for attachment in msg_file.attachments:
+        # Lire les données binaires de l'attachement
+        attachment_data = attachment.data
+        # Si l'attachement est un fichier Excel, extraire son contenu
+        if attachment.longFilename.lower().endswith(('.xlsx', '.xls')):
+            print(f"\n--- Contenu de l'Excel : {attachment.longFilename} ---")
+            excel_data = extract_excel_content_from_bytes(attachment_data)
+            if isinstance(excel_data, dict):
+                # Pour chaque feuille Excel, convertir en JSON et stocker dans un dictionnaire
+                for sheet_name, data in excel_data.items():
+                    json_data = data.to_json(orient='records', force_ascii=False)
+                    excel_tables[sheet_name] = json.loads(json_data)
+            else:
+                print(excel_data)
+    
+    # Retourner les tables Excel sous forme de données JSON
+    return excel_tables
+
+# Définir le chemin du fichier .msg
+msg_file_path = "C:\\Users\\B616ZJ\\OneDrive - AXA\\Documents\\ACL\\Temp7\\TR Sujet Communication.msg"
+
+# Extraire les informations et les pièces jointes Excel sans les enregistrer dans un dossier
+excel_tables = extract_msg_info_and_excel(msg_file_path)
+
+# Afficher les données JSON sous forme de tableaux alignés avec texttable
+for sheet_name, data in excel_tables.items():
+    print(f"\nFeuille : {sheet_name}")
+    df = pd.DataFrame(data)  # Convertir les données JSON en DataFrame
+    if not df.empty:
+        # Créer un objet Texttable
+        table = Texttable()
+        # Définir les noms des colonnes
+        table.header(df.columns.tolist())
+        # Ajouter les lignes au tableau
+        for row in df.itertuples(index=False, name=None):
+            table.add_row(row)
+        # Afficher le tableau
+        print(table.draw())
+    else:
+        print("La feuille est vide ou ne contient que des valeurs NaN.")
